@@ -1,0 +1,620 @@
+---
+title: "Estadística descriptiva"
+author:
+  - name: "Chavez Huapeo Jacqueline"
+    affiliations: "Universidad Michoacana de San Nicólas de Hidalgo" 
+    email: "2002159x@umich.mx"
+  - name: "Flores Ochoa Sofia Libertad"
+    email: "2209997a@umich.mx"
+  - name: "Mendoza Esteban Lizzet"
+    email: "2111029d@umich.mx"
+  - name: "Lopez Carmona Audrey Carolina"
+    email: "2209983d@umich.mx"
+  - name: "Rosas Moreno Alesi"
+    email: "2209988c@umich.mx"
+toc: TRUE
+format:  html
+editor: visual
+---
+
+![](Logo_de_la_UMSNH.png){width="3cm"}
+
+La estadística descriptiva, como su nombre lo dice, sirve para describir el comportamiento que tienen los valores de una variable aleatoria (X). Esto con el fin de, una vez descrito el mismo, poder hacer inferencias (estimaciones o pronósticos) sobre el comportamiento que tendrá o podría tener dicha variable. En el presente trabajo se analizaron: acciones mexicanas, acciones de EEUU, índices y futuros. Para las acciones mexicanas se analizaron 5 empresas mexicanas, siendo estas: ALFAA, BIMBOA, GFNORTEO, GRUMAB y LACOMERUBC; En cuanto a acciones de EEUU se analizaron 6, las cuales son: AAPL, GOOGL, META, GRMN, ARKF y ARKX; Para el caso de índices se analizaron solo tres: IPC, Dow Jones y S&P500; finalmente para el caso de futuros se analizaron 4: Petróleo, Maíz, Azúcar y Oro. Dando un total de 18 empresas a analizar. Los datos utilizados de las 18 empresas se obtuvieron mediante una descarga a través de Yahoo Finance y se utilizaron en moneda mexicana para el análisis. Para poder llevar a cabo el análisis se realizó un tabla resumen para el rendimiento continuo y otra para el P/L que contiene la media, mediana, desviación estándar, quantil 5%, quantil 95%, máximo, mínimo y conteo para todas y cada una de las empresas anteriormente mencionadas. Posteriormente se realizaron matrices y gráficas para poder comparar de una manera más visual los datos obtenidos de las tablas resumen.
+
+```{r librerias, include=FALSE}
+#Carga de librerias
+library(plotly)
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+source("https://raw.githubusercontent.com/OscarVDelatorreTorres/yahooFinance/main/datosMultiplesYahooFinance.R")
+```
+
+```{r carga_de_acciones, include=FALSE}
+#Carga de todas los datos
+tickerv=c("ALFAA.MX","BIMBOA.MX","GFNORTEO.MX","GRUMAB.MX","LACOMERUBC.MX","VOLARA.MX","AAPL","GOOGL","META","GRMN","ARKF","ARKX","^MXX","^DJI","^GSPC","WTI","ZC=F","SB=F","GC=F")
+deD=Sys.Date()-1095
+hastaD=Sys.Date()
+per="D"
+paridadFX="USDMXN=X"
+convertirFX=c(FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,FALSE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE)
+Datos=historico_multiples_precios(tickers=tickerv,de=deD,hasta=hastaD,periodicidad=per,fxRate=paridadFX,whichToFX=convertirFX)
+```
+
+# Tabla resumen:
+
+## Rendimientos continuos:
+
+```{r datos_tabla_, include=FALSE}
+# Vector de medias:
+mediaAcciones=colMeans(Datos$tablaRendimientosCont[,-1])
+# Vector de desviaciones estÃ¡ndar:
+desvAcciones=apply(Datos$tablaRendimientosCont[,-1],2,sd)
+cuantiles_5=apply(Datos$tablaRendimientosCont[,-1], 2, quantile, probs = 0.05, na.rm = TRUE)
+cuantiles_95=apply(Datos$tablaRendimientosCont[,-1], 2, quantile, probs = 0.95, na.rm = TRUE)
+cont=count(Datos$tablaRendimientosCont)
+# Tabla de resumen:
+tablaResumenRC=data.frame(Media=mediaAcciones,
+                        DesviacionEstandar=desvAcciones,
+                        min=apply(Datos$tablaRendimientosCont[,-1],2,min),
+                        max=apply(Datos$tablaRendimientosCont[,-1],2,max),
+                        cuantil5=cuantiles_5,
+                        cuantil95=cuantiles_95,
+                        Conteo=cont
+                        )
+```
+
+```{r tablaResumen}
+tablaResumenRC
+```
+
+## PL:
+
+```{r datos_tabla_PL_, include=FALSE}
+# Vector de medias:
+mediaAccionesPL=colMeans(Datos$tablaPL[,-1])
+# Vector de desviaciones estÃ¡ndar:
+desvAccionesPL=apply(Datos$tablaPL[,-1],2,sd)
+cuantiles_5PL=apply(Datos$tablaPL[,-1], 2, quantile, probs = 0.05, na.rm = TRUE)
+cuantiles_95PL=apply(Datos$tablaPL[,-1], 2, quantile, probs = 0.95, na.rm = TRUE)
+contPL=count(Datos$tablaPL)
+# Tabla de resumen:
+tablaResumenPL=data.frame(                    
+                        MediaPL=mediaAccionesPL,
+                        DesviacionEstandarPL=desvAccionesPL,
+                        minPL=apply(Datos$tablaPL[,-1],2,min),
+                        maxPL=apply(Datos$tablaPL[,-1],2,max),
+                        cuantil5PL=cuantiles_5PL,
+                        cuantil95PL=cuantiles_95PL,
+                        ConteoPL=contPL
+                        )
+```
+
+```{r tablaResumenPL}
+tablaResumenPL
+```
+
+# Gráficas:
+
+## Comparativa
+
+```{r grafica_, include=FALSE}
+# Objeto de base de datos de precios base 100 (Ã­ndice):
+base100Calc=function(x){
+  return((x/x[1])*100)
+}
+# Tomo todos los histÃ³ricos con excepciÃ³n de la columna fecha para el cÃ¡lculo:
+preciosB100=Datos$tablaPrecios[,-1]
+# Aplico la funciÃ³n Base 100 a cada columna:
+preciosB100=apply(preciosB100,2,base100Calc)
+# Agrego la columna de fechas creando un data.frame con la pura fecha y asÃ­ respete el formato de fecha y la concateno con los precios base 100:
+preciosB100=cbind(data.frame(Fate=Datos$tablaPrecios$Date),
+                  preciosB100)
+# Convierto a base de datos "largo":
+DatosGraficaPreciosB100=preciosB100 %>%
+  pivot_longer(cols=-Fate,names_to="Ticker",values_to="PrecioBase100")
+
+# Hacemos la base de datos de los rendimientos:
+DatosGraficaRendimientos=Datos$tablaRendimientosCont %>%
+  pivot_longer(cols=-Date,names_to="Ticker",values_to="RendimientoCont")
+DatosGraficaRendimientos
+
+DatosGraficaRendimientosPL=Datos$tablaPL %>%
+  pivot_longer(cols=-Date,names_to="Ticker",values_to="PL")
+DatosGraficaRendimientosPL
+
+fig1a=plot_ly()%>%
+  add_trace(data=DatosGraficaPreciosB100,
+            x=~Fate,
+            y=~PrecioBase100,
+            color=~Ticker,
+            type="scatter",
+            mode="lines")
+fig1b=plot_ly()%>%
+  add_trace(data=DatosGraficaRendimientos,
+            x=~Date,
+            y=~RendimientoCont,
+            color=~Ticker,
+            type="scatter",
+            mode="lines")
+fig1c=plot_ly()%>%
+  add_trace(data=DatosGraficaRendimientosPL,
+            x=~Date,
+            y=~PL,
+            color=~Ticker,
+            type="scatter",
+            mode="lines")
+
+fig1=subplot(fig1a,fig1b,fig1c,
+             nrows=3,
+             shareX=TRUE, 
+             titleY=TRUE) %>%
+  layout(title="Comparativo de todas las acciones",
+         yaxis1=list(title="Precio Base 100"),
+         yaxis2=list(title="Rendimiento Continuo (%)"),
+         yaxis3=list(title="P/L"))
+
+```
+
+```{r grafica_TD}
+fig1
+```
+
+# Dispersión
+
+```{r dispersión, include=FALSE}
+dispersion_base_100=preciosB100[,-1]
+dispersion_RC=Datos$tablaRendimientosCont[,-1]
+dispersion_PL=Datos$tablaRendimientosCont[,-1]
+```
+
+## Base 100
+
+```{r, include=FALSE}
+axis <- list(
+  showline = FALSE,
+  zeroline = FALSE,
+  gridcolor = '#ffff',
+  ticklen = 4
+)
+
+fig_d <- plot_ly(data = dispersion_base_100) %>%
+  add_trace(
+    type = 'splom',
+    dimensions = list(
+      list(label = 'ALFAA', values = ~ALFAA.MX),
+      list(label = 'BIMBOA', values = ~BIMBOA.MX),
+      list(label = 'GFNORTEO', values = ~GFNORTEO.MX),
+      list(label = 'GRUMAB', values = ~GRUMAB.MX),
+      list(label = 'LACOMERUBC', values = ~LACOMERUBC.MX),
+      list(label = 'VOLARA', values = ~VOLARA.MX),
+      list(label = 'AAPL', values = ~AAPL),
+      list(label = 'GOOGL', values = ~GOOGL),
+      list(label = 'META', values = ~META),
+      list(label = 'GRMN', values = ~GRMN),
+      list(label = 'ARKF', values = ~ARKF),
+      list(label = 'ARKX', values = ~ARKX),
+      list(label = 'MXX', values = ~MXX),
+      list(label = 'DJI', values = ~DJI),
+      list(label = 'GSPC', values = ~GSPC),
+      list(label = 'WTI', values = ~WTI),
+      list(label = 'ZCF', values = ~ZCF),
+      list(label = 'SBF', values = ~SBF),
+      list(label = 'GCF', values = ~GCF)
+    ),
+
+    marker = list(
+      color = '#5394ff',
+      size = 7,
+      line = list(
+        width = 1,
+        color = 'rgb(230,230,230)'
+      )
+    )
+  ) %>%
+  layout(
+    title = 'Base 100 matriz de dispersión',
+    hovermode = 'closest',
+    dragmode = 'select',
+    plot_bgcolor = 'rgba(240,240,240, 0.95)',
+    xaxis = list(
+      domain = NULL, 
+      showline = FALSE, 
+      zeroline = FALSE, 
+      gridcolor = '#ffff', 
+      ticklen = 4
+    ),
+    yaxis = list(
+      domain = NULL, 
+      showline = FALSE, 
+      zeroline = FALSE, 
+      gridcolor = '#ffff', 
+      ticklen = 4
+    ),
+    xaxis2 = axis,
+    xaxis3 = axis,
+    xaxis4 = axis,
+    xaxis5 = axis,
+    xaxis6 = axis,
+    xaxis7 = axis,
+    xaxis8 = axis,
+    xaxis9 = axis,
+    xaxis10 = axis,
+    xaxis11 = axis,
+    xaxis12 = axis,
+    xaxis13 = axis,
+    xaxis14 = axis,
+    xaxis15 = axis,
+    xaxis16 = axis,
+    xaxis17 = axis,
+    xaxis18 = axis,
+    xaxis19 = axis,
+    yaxis2 = axis,
+    yaxis3 = axis,
+    yaxis4 = axis,
+    yaxis5 = axis,
+    yaxis6 = axis,
+    yaxis7 = axis,
+    yaxis8 = axis,
+    yaxis9 = axis,
+    yaxis10 = axis,
+    yaxis11 = axis,
+    yaxis12 = axis,
+    yaxis13 = axis,
+    yaxis14 = axis,
+    yaxis15 = axis,
+    yaxis16 = axis,
+    yaxis17 = axis,
+    yaxis18 = axis,
+    yaxis19 = axis
+  )
+fig_d= fig_d  %>% style(diagonal = list(visible = F))
+fig_d_RC <- plot_ly(data = dispersion_RC) %>% 
+  add_trace(
+    type = 'splom',
+    dimensions = list(
+      list(label = 'ALFAA', values = ~ALFAA.MX),
+      list(label = 'BIMBOA', values = ~BIMBOA.MX),
+      list(label = 'GFNORTEO', values = ~GFNORTEO.MX),
+      list(label = 'GRUMAB', values = ~GRUMAB.MX),
+      list(label = 'LACOMERUBC', values = ~LACOMERUBC.MX),
+      list(label = 'VOLARA', values = ~VOLARA.MX),
+      list(label = 'AAPL', values = ~AAPL),
+      list(label = 'GOOGL', values = ~GOOGL),
+      list(label = 'META', values = ~META),
+      list(label = 'GRMN', values = ~GRMN),
+      list(label = 'ARKF', values = ~ARKF),
+      list(label = 'ARKX', values = ~ARKX),
+      list(label = 'MXX', values = ~MXX),
+      list(label = 'DJI', values = ~DJI),
+      list(label = 'GSPC', values = ~GSPC),
+      list(label = 'WTI', values = ~WTI),
+      list(label = 'ZCF', values = ~ZCF),
+      list(label = 'SBF', values = ~SBF),
+      list(label = 'GCF', values = ~GCF)
+    ),
+
+    marker = list(
+      color = 'purple',
+      size = 7,
+      line = list(
+        width = 1,
+        color = 'rgb(230,230,230)'
+      )
+    )
+  ) %>%
+  layout(
+    title = 'Rendimientos continuos matriz de dispersión',
+    hovermode = 'closest',
+    dragmode = 'select',
+    plot_bgcolor = 'rgba(240,240,240, 0.95)',
+    xaxis = list(
+      domain = NULL, 
+      showline = FALSE, 
+      zeroline = FALSE, 
+      gridcolor = '#ffff', 
+      ticklen = 4
+    ),
+    yaxis = list(
+      domain = NULL, 
+      showline = FALSE, 
+      zeroline = FALSE, 
+      gridcolor = '#ffff', 
+      ticklen = 4
+    ),
+    xaxis2 = axis,
+    xaxis3 = axis,
+    xaxis4 = axis,
+    xaxis5 = axis,
+    xaxis6 = axis,
+    xaxis7 = axis,
+    xaxis8 = axis,
+    xaxis9 = axis,
+    xaxis10 = axis,
+    xaxis11 = axis,
+    xaxis12 = axis,
+    xaxis13 = axis,
+    xaxis14 = axis,
+    xaxis15 = axis,
+    xaxis16 = axis,
+    xaxis17 = axis,
+    xaxis18 = axis,
+    xaxis19 = axis,
+    yaxis2 = axis,
+    yaxis3 = axis,
+    yaxis4 = axis,
+    yaxis5 = axis,
+    yaxis6 = axis,
+    yaxis7 = axis,
+    yaxis8 = axis,
+    yaxis9 = axis,
+    yaxis10 = axis,
+    yaxis11 = axis,
+    yaxis12 = axis,
+    yaxis13 = axis,
+    yaxis14 = axis,
+    yaxis15 = axis,
+    yaxis16 = axis,
+    yaxis17 = axis,
+    yaxis18 = axis,
+    yaxis19 = axis
+  )
+fig_d_RC <-  fig_d_RC %>% style(diagonal = list(visible = F))
+
+fig_d_PL <- plot_ly(data = dispersion_PL) %>%
+  add_trace(
+    type = 'splom',
+    dimensions = list(
+      list(label = 'ALFAA', values = ~ALFAA.MX),
+      list(label = 'BIMBOA', values = ~BIMBOA.MX),
+      list(label = 'GFNORTEO', values = ~GFNORTEO.MX),
+      list(label = 'GRUMAB', values = ~GRUMAB.MX),
+      list(label = 'LACOMERUBC', values = ~LACOMERUBC.MX),
+      list(label = 'VOLARA', values = ~VOLARA.MX),
+      list(label = 'AAPL', values = ~AAPL),
+      list(label = 'GOOGL', values = ~GOOGL),
+      list(label = 'META', values = ~META),
+      list(label = 'GRMN', values = ~GRMN),
+      list(label = 'ARKF', values = ~ARKF),
+      list(label = 'ARKX', values = ~ARKX),
+      list(label = 'MXX', values = ~MXX),
+      list(label = 'DJI', values = ~DJI),
+      list(label = 'GSPC', values = ~GSPC),
+      list(label = 'WTI', values = ~WTI),
+      list(label = 'ZCF', values = ~ZCF),
+      list(label = 'SBF', values = ~SBF),
+      list(label = 'GCF', values = ~GCF)
+    ),
+
+    marker = list(
+      color = '#ff51b8',
+      size = 7,
+      line = list(
+        width = 1,
+        color = 'rgb(230,230,230)'
+      )
+    )
+  ) %>%
+  layout(
+    title = 'P/L matriz de dispersión',
+    hovermode = 'closest',
+    dragmode = 'select',
+    plot_bgcolor = 'rgba(240,240,240, 0.95)',
+    xaxis = list(
+      domain = NULL, 
+      showline = FALSE, 
+      zeroline = FALSE, 
+      gridcolor = '#ffff', 
+      ticklen = 4
+    ),
+    yaxis = list(
+      domain = NULL, 
+      showline = FALSE, 
+      zeroline = FALSE, 
+      gridcolor = '#ffff', 
+      ticklen = 4
+    ),
+    xaxis2 = axis,
+    xaxis3 = axis,
+    xaxis4 = axis,
+    xaxis5 = axis,
+    xaxis6 = axis,
+    xaxis7 = axis,
+    xaxis8 = axis,
+    xaxis9 = axis,
+    xaxis10 = axis,
+    xaxis11 = axis,
+    xaxis12 = axis,
+    xaxis13 = axis,
+    xaxis14 = axis,
+    xaxis15 = axis,
+    xaxis16 = axis,
+    xaxis17 = axis,
+    xaxis18 = axis,
+    xaxis19 = axis,
+    yaxis2 = axis,
+    yaxis3 = axis,
+    yaxis4 = axis,
+    yaxis5 = axis,
+    yaxis6 = axis,
+    yaxis7 = axis,
+    yaxis8 = axis,
+    yaxis9 = axis,
+    yaxis10 = axis,
+    yaxis11 = axis,
+    yaxis12 = axis,
+    yaxis13 = axis,
+    yaxis14 = axis,
+    yaxis15 = axis,
+    yaxis16 = axis,
+    yaxis17 = axis,
+    yaxis18 = axis,
+    yaxis19 = axis
+  )
+fig_d_PL <-  fig_d_PL %>% style(diagonal = list(visible = F))
+
+```
+
+```{r}
+fig_d
+```
+
+## Rendimientos continuos
+
+```{r}
+fig_d_RC
+```
+
+## P/L
+
+```{r}
+fig_d_PL
+```
+
+# Covarianza
+
+## Covarianza Rendimiento continuo
+
+```{r datos_cov_RC_, include=FALSE}
+covarianzasRC=cov(Datos$tablaRendimientosCont[,-1])
+```
+
+```{r cov_RC}
+covarianzasRC
+```
+
+```{r datos_mapa_cov_RC_, include=FALSE}
+figm_COV_RC=plot_ly(x=colnames(covarianzasRC),
+             y=rownames(covarianzasRC),
+             z=as.matrix(covarianzasRC),
+             type="heatmap") %>%
+  layout(title="Matriz de covarianzas de rendimiento continuo",
+         xaxis=list(title=""),
+         yaxis=list(title=""))
+```
+
+```{r mapa_cov_RC_}
+figm_COV_RC
+```
+
+## Covarianza P/L
+
+```{r datos_cov_PL_, include=FALSE}
+covarianzasPL=cov(Datos$tablaPL[,-1])
+```
+
+```{r cov_PL}
+covarianzasPL
+```
+
+```{r datos_mapa_cov_PL, include=FALSE}
+figm_COV_PL=plot_ly(x=colnames(covarianzasPL),
+             y=rownames(covarianzasPL),
+             z=as.matrix(covarianzasPL),
+             type="heatmap") %>%
+  layout(title="Matriz de covarianzas de P/L",
+         xaxis=list(title=""),
+         yaxis=list(title=""))
+```
+
+```{r mapa_cov_PL}
+figm_COV_PL
+```
+
+# Correlación
+
+## Correlación Rendimientos continuos
+
+```{r datos_cor_RC, include=FALSE}
+correlacionesRC=cor(Datos$tablaRendimientosCont[,-1])
+```
+
+```{r cor_RC}
+correlacionesRC
+```
+
+```{r datos_mapa_cor_RC, include=FALSE}
+figm_COR_RC=plot_ly(x=colnames(correlacionesRC),
+             y=rownames(correlacionesRC),
+             z=as.matrix(correlacionesRC),
+             type="heatmap") %>%
+  layout(title="Matriz de correlaciones de rendimiento continuo",
+         xaxis=list(title=""),
+         yaxis=list(title=""))
+```
+
+```{r mapa_cor_RC}
+figm_COR_RC
+```
+
+## Correlación P/L
+
+```{r datos_cor_PL, include=FALSE}
+correlacionesPL=cor(Datos$tablaPL[,-1])
+```
+
+```{r cor_PL}
+correlacionesPL
+```
+
+```{r datos_mapas_cor_PL, include=FALSE}
+figm_COR_PL=plot_ly(x=colnames(correlacionesPL),
+             y=rownames(correlacionesPL),
+             z=as.matrix(correlacionesPL),
+             type="heatmap") %>%
+  layout(title="Matriz de correlaciones de P/L",
+         xaxis=list(title=""),
+         yaxis=list(title=""))
+```
+
+```{r mapa_cor_PL}
+figm_COR_PL
+```
+
+# Ánalisis e Interpretación
+
+## Acciones mexicanas
+
+*ALFAA.MX - Alfa, BIMBOA.MX - Grupo Bimbo, GFNORTEO.MX - Grupo Financiero Banorte, GRUMAB.MX - Gruma, LACOMERUBC.MX - La Comer, VOLARA.MX - Volaris*
+
+**Base 100:** Banorte es una de las acciones con mejor desempeño. Se mantiene constante por encima del valor inicial, llegando a niveles cercanos a 150–170, lo que indica un crecimiento, a pesar de que tuvo una baja en junio del 2024 su precio después de ese momento comenzó nuevamente a subir. Por otro lado, la acción de Gruma también muestra un buen comportamiento, con subidas marcadas y manteniéndose por encima de la base a lo largo del periodo y con los precios más altos de todas las acciones mexicanas graficadas. Asimismo podemos ver que la acción de Volaris es la de peor desempeño puesto tiene caídas muy pronunciadas y se mantiene en niveles bajos lo que refleja un retroceso significativo respecto al inicio.
+
+**Rendimientos:** Alfa es una de las acciones que a pesar de que sigue la tendencia estable como las demás acciones mexicanas, esta tuvo episodios muy drásticos que podemos observar en la gráfica de modo que se ve una subida pronunciada en septiembre del 2024 tanto como una bajada en marzo del 2025 llegando a valores negativos.
+
+**P/L:** Volaris es una de las acciones con mayor volatilidad dentro de las acciones mexicanas que tenemos graficadas. Esta muestra una variación de rendimiento muy marcado en distintos momentos lo cual no sigue la tendencia de las demás acciones mexicanas, y a su vez muestra bajas muy pronunciadas en Febrero y Abril del 2025, estas siendo seguidas de alzas en los precios de la acción. Otra de las acciones con mayor volatilidad es la de Alfa, aunque esta muestra una tendencia más estable tiene algunos puntos de volatilidad muy marcada como en Septiembre del 2024 tuvo un pico muy alto, mientras que en Marzo del 2024 tuvo una baja muy pronunciada, que esta fue la mayor baja de las acciones graficadas y a pesar de ello esta no es negativa de modo aunque existieron alzas y bajas en distintos momentos de todas las acciones estas no llegaron a ser perdidas, lo cual es algo de destacar. 
+
+## Acciones EU
+
+*AAPL, GOOGL, META, GRN, ARKF, ARKX*
+
+**Base 100:** En este resultado podemos observar que META se comporta como una montaña rusa: un día la inversión puede subir bastante y al día siguiente bajar de golpe. Aunque en promedio está ligeramente por encima del punto de inicio (base 100), esa desviación tan alta significa que no hay estabilidad en el corto plazo. Es como tener un ingreso variable: algunos días ganas más de lo normal, otros menos, y tienes que estar preparado para esos altibajos.
+
+**Rendimientos:** Aquí podemos ver que META +0.208% (promedio diario) es la acción que más “paga” por día, pero también la que más riesgo tiene de recortes, más volátil (2.74%). ARKF +0.1552% (promedio), en cambio, tiene un rendimiento algo menor pero sigue siendo atractivo con una volatilidad medio-alta (2.35%), con menos altibajos que META. Si “inviertes” en META obtienes la posibilidad de ganancias rápidas y grandes, pero también pérdidas rápidas y grandes; con ARKF obtienes un balance intermedio.
+
+**P/L:** El “marcador” de META tiene la desviación más alta en P/L (0.027) en la gráfica se mueve mucho alrededor del nivel normal. Si fuera una cuenta bancaria, sería como ver el saldo subir y bajar varios cientos de pesos cada día sin un patrón fijo. Esto implica que si compras META debes estar cómodo con ver tu saldo moverse mucho día con día; no da mucha tranquilidad.
+
+En las gráficas vemos que META, AAPL y GOOGL se comportan similar, como cuando uno sube, los otros tienden a subir también; cuando uno baja, los demás suelen bajar. Esto quiere decir que si armas una cartera solo con estos tres activos, no estás realmente diversificando. Para reducir riesgo, se necesitaría mezclar con activos menos correlacionados (como GRN u otros sectores).
+
+## Índices
+
+*MXX - IPC, DJI - Dow Jones, GSPC - S&P 500*
+
+**Base 100:** Si se hubieran invertido en de septiembre de 2022, hoy en el S&P 500 la inversión habría crecido a aproximadamente un 45%, reflejando tanto su fuerte rendimiento , lo que indica expectativas de crecimiento elevadas pero también un mayor riesgo, en el Dow Jones estaría cerca de un 24%, mostrando crecimiento moderado y una estabilidad relativa, mientras que en el IPC México la inversión habría llegado a un aproximado de 15% de rendimiento, reflejando un precio más barato en relación con sus ganancias, aunque con mayor volatilidad y dependencia de factores locales, lo que representa una oportunidad más arriesgada pero potencialmente rentable, podemos observar a lo largo de la gráfica como al inicio el IPC de México era el más rentable de invertir pero a partir de Junio de 2024 vemos que el IPC baja y el S&P500 lidera, de manera que hoy en día el S&P500 tiene un mayor rendimiento a comparación del IPC, mientras que el Down Jones se mantuvo.
+
+**Rendimientos:** Si en septiembre del 2022  se hubieran invertido \$100, hoy en el S&P 500 tendría entre \$140 y \$150 (un crecimiento de alrededor del +45%), en el Dow Jones tendría entre \$120 y \$130 (ganancia de +25%), y en el IPC México sólo entre \$110 y \$120 (ganancia aproximada de +15%),es decir que, el S&P 500 fue la inversión más rentable, seguido del Dow Jones, mientras que el IPC México quedó rezagado y con más volatilidad.
+
+**P/L:** El S&P 500 tiene un P/L de aproximadamente 30.5, el más alto de los tres, lo que indica que los inversores podrían esperar un fuerte crecimiento de las empresas estadounidenses, especialmente en tecnología, además también refleja un mayor precio relativo a sus ganancias y un posible riesgo si el crecimiento disminuye.
+
+El Dow Jones, con un P/L de alrededor de 22.3, representa empresas grandes, estables y tradicionales, pagando menos por cada dólar de ganancia y por lo tanto con menor riesgo y crecimiento esperado.
+
+Mientras que el IPC México, con un P/L de unos 12.9, muestra que las acciones mexicanas están más baratas en relación con sus ganancias, lo que puede ser una oportunidad de inversión, aunque con mayor volatilidad y más dependiente de factores locales como tipo de cambio, política económica y petróleo.
+
+## Futuros
+
+*gcf- oro, wti- petroleo, zcf- maíz, sbf-azúcar.*
+
+**Base 100:** En la gráfica de base 100 podemos observar que hace 3 años alrededor de noviembre del 2022, quién tenía las inversiones más altas a futuro con 121.30 era el WTI (petróleo), sin embargo,  a partir de esta misma fecha comenzó a decaer, ocupando hoy en día el último lugar de las inversiones futuras con 23.12, incluso por debajo de ZCF (maíz) y SBF (azúcar). Por otro lado, el  GCF (oro) ha tenido un crecimiento significativo pues de 98.07 que tenía para noviembre de hace tres años, aumentó hasta alrededor de 200.98 para septiembre de este año. 
+
+**Rendimientos:** En cuanto las gráficas de rendimiento, podemos percatarnos de que el WTI (petróleo) es quién ocupa los mayores rendimientos continuos con 10.713556 en Marzo de 2023, pero a su vez también ocupa el de mayores pérdidas con -19.915889 para noviembre del 2022. Esto debido a la versatilidad del petróleo, pues en la tabla resumen de futuros podemos ver que su desviación estándar es de 3.6148572 lo que nos indica que es una variable difícil de predecir. 
+
+**P/L:** Para la gráfica de P/L podemos ver que la mayoría de las variables se concentran alrededor de 1, lo que nos indica que el precio diario cambia en una unidad diariamente, a excepción del ZCF (maíz) en el que se encuentran cuatro eventos donde este cambio es de 0 lo que es decir, no hubo variación en el precio. Cabe mencionar que todas la variables son mayores a 0, no se encontraron variaciones negativas, por lo que podemos concluir que los precios se encuentran a la alza para los futuros.
